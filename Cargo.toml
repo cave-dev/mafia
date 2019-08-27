@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["ahouts <ahouts4@gmail.com>"]
 edition = "2018"
 
+[profile.release]
+lto = true
+
 [dependencies]
 serde = "1.0"
 serde_json = "1.0"

@@ -79,12 +79,24 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(name: String) -> Player {
+    pub fn new(name: PlayerName) -> Player {
         Player {
             name,
             state: PlayerState::default(),
             session: Session::default(),
             role: PlayerRole::default(),
         }
+    }
+
+    pub fn set_session(self, session: Session) -> Self {
+        Player { session, ..self }
+    }
+
+    pub fn set_state(self, state: PlayerState) -> Self {
+        Player { state, ..self }
+    }
+
+    pub fn set_role(self, role: PlayerRole) -> Self {
+        Player { role, ..self }
     }
 }
