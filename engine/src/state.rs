@@ -1,9 +1,7 @@
-use crate::lobby::LobbyState;
-use crate::morning::MorningState;
+use crate::phases::{Evening, LastWords, Lobby, Morning, Night, Vote};
 use crate::player::{Player, PlayerName};
 use crate::player_connection::PlayerConnection;
 use crate::ruleset::Ruleset;
-use crate::vote::VoteState;
 use chrono::{DateTime, Utc};
 use im::{vector, HashSet, Vector};
 use serde::{Deserialize, Serialize};
@@ -18,13 +16,13 @@ pub struct State<PC: PlayerConnection> {
     host: PlayerName,
 
     #[serde(flatten)]
-    ext: StateExt,
+    phase: Phase,
 }
 
 impl<PC: PlayerConnection> State<PC> {
     pub fn new(rules: Ruleset, host: Player<PC>) -> Self {
         let next_state_time = rules.day_end();
-        let ext = rules.init_morning();
+        let phase = rules.init_phase();
         let host_name = host.get_name().to_string();
         State {
             day: 1,
@@ -33,43 +31,71 @@ impl<PC: PlayerConnection> State<PC> {
             vote_skip: HashSet::new(),
             next_state_time,
             host: host_name,
-            ext,
+            phase,
         }
     }
 }
 
 #[derive(Serialize, Deserialize)]
-#[serde(tag = "stage")]
-pub enum StateExt {
-    Lobby(LobbyState),
-    Morning(MorningState),
-    Vote(VoteState),
+#[serde(tag = "phase")]
+pub enum Phase {
+    Lobby(Lobby),
+    Morning(Morning),
+    Vote(Vote),
+    LastWords(LastWords),
+    Evening(Evening),
+    Night(Night),
 }
 
-impl StateExt {
-    pub fn same_state(&self, other: &StateExt) -> bool {
-        use StateExt::*;
+impl Phase {
+    pub fn same_state(&self, other: &Phase) -> bool {
+        use Phase::*;
         match (self, other) {
-            (Lobby(_), Lobby(_)) | (Morning(_), Morning(_)) | (Vote(_), Vote(_)) => true,
+            (Lobby(_), Lobby(_))
+            | (Morning(_), Morning(_))
+            | (Vote(_), Vote(_))
+            | (LastWords(_), LastWords(_))
+            | (Evening(_), Evening(_))
+            | (Night(_), Night(_)) => true,
             _ => false,
         }
     }
+
+    pub fn next_state(&mut self) {}
 }
 
-impl From<LobbyState> for StateExt {
-    fn from(s: LobbyState) -> Self {
-        StateExt::Lobby(s)
+impl From<Lobby> for Phase {
+    fn from(s: Lobby) -> Self {
+        Phase::Lobby(s)
     }
 }
 
-impl From<MorningState> for StateExt {
-    fn from(s: MorningState) -> Self {
-        StateExt::Morning(s)
+impl From<Morning> for Phase {
+    fn from(s: Morning) -> Self {
+        Phase::Morning(s)
     }
 }
 
-impl From<VoteState> for StateExt {
-    fn from(s: VoteState) -> Self {
-        StateExt::Vote(s)
+impl From<Vote> for Phase {
+    fn from(s: Vote) -> Self {
+        Phase::Vote(s)
+    }
+}
+
+impl From<LastWords> for Phase {
+    fn from(s: LastWords) -> Self {
+        Phase::LastWords(s)
+    }
+}
+
+impl From<Evening> for Phase {
+    fn from(s: Evening) -> Self {
+        Phase::Evening(s)
+    }
+}
+
+impl From<Night> for Phase {
+    fn from(s: Night) -> Self {
+        Phase::Night(s)
     }
 }

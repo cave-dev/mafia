@@ -1,5 +1,5 @@
-use crate::morning::MorningState;
-use crate::state::StateExt;
+use crate::phases::Morning;
+use crate::state::Phase;
 use crate::util::{de_opt_dur, se_opt_dur};
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,7 @@ impl Ruleset {
         }
     }
 
-    pub fn init_morning(&self) -> StateExt {
-        MorningState {}.into()
+    pub fn init_phase(&self) -> Phase {
+        Morning {}.into()
     }
 }

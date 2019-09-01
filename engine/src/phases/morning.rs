@@ -1,4 +1,4 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
-pub struct LobbyState {}
+pub struct Morning {}
