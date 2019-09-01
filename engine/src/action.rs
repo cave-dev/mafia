@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct Action {
     #[serde(flatten)]
-    a: ActionE,
+    pub a: ActionE,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -14,5 +14,5 @@ pub enum ActionE {
 
 #[derive(Serialize, Deserialize)]
 pub struct ActionMessage {
-    text: String,
+    pub text: String,
 }

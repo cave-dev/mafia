@@ -7,13 +7,19 @@ use im::{vector, HashSet, Vector};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
+pub struct RootState<PC: PlayerConnection> {
+    pub day: u32,
+    pub players: Vector<Player<PC>>,
+    pub rules: Ruleset,
+    pub vote_skip: HashSet<PlayerName>,
+    pub next_state_time: Option<DateTime<Utc>>,
+    pub host: PlayerName,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct State<PC: PlayerConnection> {
-    day: u32,
-    players: Vector<Player<PC>>,
-    rules: Ruleset,
-    vote_skip: HashSet<PlayerName>,
-    next_state_time: Option<DateTime<Utc>>,
-    host: PlayerName,
+    #[serde(flatten)]
+    root: RootState<PC>,
 
     #[serde(flatten)]
     phase: Phase,
@@ -21,16 +27,18 @@ pub struct State<PC: PlayerConnection> {
 
 impl<PC: PlayerConnection> State<PC> {
     pub fn new(rules: Ruleset, host: Player<PC>) -> Self {
-        let next_state_time = rules.day_end();
+        let next_state_time = rules.morning_end();
         let phase = rules.init_phase();
         let host_name = host.get_name().to_string();
         State {
-            day: 1,
-            players: vector![host],
-            rules,
-            vote_skip: HashSet::new(),
-            next_state_time,
-            host: host_name,
+            root: RootState {
+                day: 1,
+                players: vector![host],
+                rules,
+                vote_skip: HashSet::new(),
+                next_state_time,
+                host: host_name,
+            },
             phase,
         }
     }
@@ -48,7 +56,7 @@ pub enum Phase {
 }
 
 impl Phase {
-    pub fn same_state(&self, other: &Phase) -> bool {
+    pub fn same_phase(&self, other: &Phase) -> bool {
         use Phase::*;
         match (self, other) {
             (Lobby(_), Lobby(_))
@@ -57,11 +65,14 @@ impl Phase {
             | (LastWords(_), LastWords(_))
             | (Evening(_), Evening(_))
             | (Night(_), Night(_)) => true,
-            _ => false,
+            (Lobby(_), _)
+            | (Morning(_), _)
+            | (Vote(_), _)
+            | (LastWords(_), _)
+            | (Evening(_), _)
+            | (Night(_), _) => false,
         }
     }
-
-    pub fn next_state(&mut self) {}
 }
 
 impl From<Lobby> for Phase {

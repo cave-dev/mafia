@@ -7,10 +7,10 @@ pub type PlayerNameRef<'a> = &'a str;
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Player<PC: PlayerConnection> {
     name: PlayerName,
-    connection: Option<PC>,
-    state: PlayerState,
-    role: Role,
-    secret_key: String,
+    pub connection: Option<PC>,
+    pub state: PlayerState,
+    pub role: Role,
+    pub secret_key: String,
 }
 
 impl<PC: PlayerConnection> Player<PC> {
@@ -19,10 +19,16 @@ impl<PC: PlayerConnection> Player<PC> {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Ord, PartialOrd, Eq, PartialEq)]
 pub enum PlayerState {
     Alive,
     Dead,
+}
+
+impl PlayerState {
+    pub fn is_alive(&self) -> bool {
+        *self == PlayerState::Alive
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]

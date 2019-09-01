@@ -7,12 +7,22 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct Ruleset {
     #[serde(serialize_with = "se_opt_dur", deserialize_with = "de_opt_dur")]
-    day_limit: Option<Duration>,
+    morning_limit: Option<Duration>,
+
+    #[serde(serialize_with = "se_opt_dur", deserialize_with = "de_opt_dur")]
+    vote_limit: Option<Duration>,
 }
 
 impl Ruleset {
-    pub fn day_end(&self) -> Option<DateTime<Utc>> {
-        match self.day_limit {
+    pub fn morning_end(&self) -> Option<DateTime<Utc>> {
+        match self.morning_limit {
+            Some(l) => Some(Utc::now() + l),
+            None => None,
+        }
+    }
+
+    pub fn vote_end(&self) -> Option<DateTime<Utc>> {
+        match self.vote_limit {
             Some(l) => Some(Utc::now() + l),
             None => None,
         }

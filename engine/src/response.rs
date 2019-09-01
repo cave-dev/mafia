@@ -8,6 +8,14 @@ pub struct Response {
     resp: ResponseE,
 }
 
+impl Response {
+    pub fn message(src: Option<PlayerName>, text: String) -> Self {
+        Response {
+            resp: ResponseE::Message { from: src, text },
+        }
+    }
+}
+
 impl From<Error> for Response {
     fn from(e: Error) -> Self {
         Response { resp: e.into() }
@@ -17,7 +25,10 @@ impl From<Error> for Response {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ResponseE {
-    Message { from: PlayerName, text: String },
+    Message {
+        from: Option<PlayerName>,
+        text: String,
+    },
     Error(Error),
 }
 
