@@ -1,4 +1,3 @@
-use crate::error::Result;
 use crate::player::{Player, PlayerName};
 use crate::player_connection::PlayerConnection;
 use crate::ruleset::Ruleset;
