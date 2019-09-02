@@ -10,10 +10,20 @@ pub struct Player<PC: PlayerConnection> {
     pub connection: Option<PC>,
     pub state: PlayerState,
     pub role: Role,
-    pub secret_key: String,
+    pub secret: String,
 }
 
 impl<PC: PlayerConnection> Player<PC> {
+    pub fn new(name: String, secret: String) -> Self {
+        Player {
+            name,
+            connection: None,
+            state: PlayerState::Alive,
+            role: Role::Townie,
+            secret,
+        }
+    }
+
     pub fn get_name(&self) -> PlayerNameRef {
         self.name.as_ref()
     }

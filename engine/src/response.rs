@@ -1,8 +1,8 @@
 use crate::error::Error;
 use crate::player::PlayerName;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct Response {
     #[serde(flatten)]
     resp: ResponseE,
@@ -22,7 +22,7 @@ impl From<Error> for Response {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 #[serde(tag = "type")]
 pub enum ResponseE {
     Message {

@@ -42,6 +42,14 @@ impl<PC: PlayerConnection> State<PC> {
             phase,
         }
     }
+
+    pub fn get_playername(&self, secret: &str) -> Option<PlayerName> {
+        self.root
+            .players
+            .iter()
+            .find(|p| &p.secret == secret)
+            .map(|p| p.get_name().to_string())
+    }
 }
 
 #[derive(Serialize, Deserialize)]

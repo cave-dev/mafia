@@ -1,4 +1,5 @@
-use crate::player::Player;
+use crate::error::Result;
+use crate::player::{Player, PlayerName};
 use crate::player_connection::PlayerConnection;
 use crate::ruleset::Ruleset;
 use crate::state::State;
@@ -16,5 +17,9 @@ impl<PC: PlayerConnection> Session<PC> {
             id,
             state: State::new(rules, host),
         }
+    }
+
+    pub fn get_playername(&self, secret: &str) -> Option<PlayerName> {
+        self.state.get_playername(secret)
     }
 }
