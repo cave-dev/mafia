@@ -32,3 +32,12 @@ impl Ruleset {
         Morning {}.into()
     }
 }
+
+impl Default for Ruleset {
+    fn default() -> Self {
+        Ruleset {
+            morning_limit: Some(Duration::minutes(3)),
+            vote_limit: Some(Duration::seconds(90)),
+        }
+    }
+}

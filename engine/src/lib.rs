@@ -12,4 +12,5 @@ mod util;
 pub use error::{Error, Result};
 pub use player_connection::PlayerConnection;
 pub use response::Response;
+pub use ruleset::Ruleset;
 pub use session::Session;

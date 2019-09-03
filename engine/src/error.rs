@@ -10,6 +10,8 @@ pub enum Error {
     InvalidPlayerName(PlayerName),
     InvalidSession,
     InvalidSecret,
+    PlayerNameTaken(PlayerName),
+    InternalError,
 }
 
 impl fmt::Display for Error {
@@ -19,6 +21,8 @@ impl fmt::Display for Error {
             InvalidPlayerName(p) => write!(f, "invalid player name: {}", p),
             InvalidSession => write!(f, "invalid session id"),
             InvalidSecret => write!(f, "invalid secret"),
+            PlayerNameTaken(p) => write!(f, "name {} is already taken!", p),
+            InternalError => write!(f, "internal error"),
         }
     }
 }

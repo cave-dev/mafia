@@ -1,7 +1,9 @@
+use crate::error::Error;
 use crate::phases::{Evening, LastWords, Lobby, Morning, Night, Vote};
-use crate::player::{Player, PlayerName};
+use crate::player::{Player, PlayerName, PlayerNameRef};
 use crate::player_connection::PlayerConnection;
 use crate::ruleset::Ruleset;
+use crate::Result;
 use chrono::{DateTime, Utc};
 use im::{vector, HashSet, Vector};
 use serde::{Deserialize, Serialize};
@@ -26,10 +28,10 @@ pub struct State<PC: PlayerConnection> {
 }
 
 impl<PC: PlayerConnection> State<PC> {
-    pub fn new(rules: Ruleset, host: Player<PC>) -> Self {
+    pub fn new(rules: Ruleset, host_name: PlayerName, host_secret: String) -> Self {
         let next_state_time = rules.morning_end();
         let phase = rules.init_phase();
-        let host_name = host.get_name().to_string();
+        let host = Player::new(host_name.clone(), host_secret);
         State {
             root: RootState {
                 day: 1,
@@ -47,8 +49,46 @@ impl<PC: PlayerConnection> State<PC> {
         self.root
             .players
             .iter()
-            .find(|p| &p.secret == secret)
+            .find(|p| p.secret == secret)
             .map(|p| p.get_name().to_string())
+    }
+
+    pub fn get_connection(&self, player_name: PlayerNameRef) -> Option<PC> {
+        match self
+            .root
+            .players
+            .iter()
+            .find(|p| p.get_name() == player_name)
+            .map(|p| p.connection.clone())
+        {
+            Some(Some(v)) => Some(v),
+            _ => None,
+        }
+    }
+
+    pub fn register_connection(&mut self, player_name: PlayerName, conn: Option<PC>) {
+        let player_o = self
+            .root
+            .players
+            .iter_mut()
+            .find(|p| p.get_name() == &player_name);
+        if let Some(player) = player_o {
+            player.connection = conn;
+        }
+    }
+
+    pub fn create_user(&mut self, player_name: PlayerName, secret: String) -> Result<()> {
+        if self
+            .root
+            .players
+            .iter()
+            .any(|p| p.get_name() == &player_name)
+        {
+            return Err(Error::InvalidPlayerName(player_name));
+        }
+        let player = Player::new(player_name, secret);
+        self.root.players.push_back(player);
+        Ok(())
     }
 }
 
