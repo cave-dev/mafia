@@ -10,8 +10,8 @@ use actix_web::http::StatusCode;
 use actix_web::middleware::Logger;
 use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer};
 use actix_web_actors::ws;
-use log::{debug, error, info};
-use mafia::{Error as MError, PlayerConnection, Response, Ruleset, Session};
+use log::{debug, error};
+use mafia::{Error as MError, PlayerConnection, Response, Ruleset, State};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -27,9 +27,9 @@ fn gen_uuid() -> String {
 use once_cell::sync::Lazy;
 
 static CONNECTION_MANAGER: Lazy<Addr<ConnectionManager>> =
-    Lazy::new(|| ConnectionManager::start_default());
+    Lazy::new(ConnectionManager::start_default);
 
-static SESSION_MANAGER: Lazy<Addr<SessionManager>> = Lazy::new(|| SessionManager::start_default());
+static SESSION_MANAGER: Lazy<Addr<SessionManager>> = Lazy::new(SessionManager::start_default);
 
 struct AppState {
     cm: Addr<ConnectionManager>,
@@ -139,7 +139,7 @@ impl Handler<GetSession> for SessionManager {
     type Result = Option<Addr<GameSession>>;
 
     fn handle(&mut self, msg: GetSession, _: &mut Self::Context) -> Self::Result {
-        self.sessions.get(&msg.id).map(|v| v.clone())
+        self.sessions.get(&msg.id).cloned()
     }
 }
 
@@ -157,7 +157,7 @@ impl Handler<CreateSession> for SessionManager {
     fn handle(&mut self, msg: CreateSession, _: &mut Self::Context) -> Self::Result {
         let sess_id = gen_uuid();
         let host_secret = gen_uuid();
-        let session = GameSession::new(sess_id.clone(), msg.host_name, host_secret.clone()).start();
+        let session = GameSession::new(msg.host_name, host_secret.clone()).start();
         debug!("adding session {} to sessions", sess_id);
         self.sessions.insert(sess_id.clone(), session);
         CreateSessionRes {
@@ -184,24 +184,19 @@ impl MessageResponse<SessionManager, CreateSession> for CreateSessionRes {
     }
 }
 
-struct SessionJoined {
-    session_id: String,
-    secret: String,
-}
-
 struct JoinSession {
     session_id: String,
     name: String,
 }
 
 impl Message for JoinSession {
-    type Result = Result<JoinSessionRes, MError>;
+    type Result = Result<SessionJoined, MError>;
 }
 
 impl Handler<JoinSession> for SessionManager {
-    type Result = ResponseActFuture<Self, JoinSessionRes, MError>;
+    type Result = ResponseActFuture<Self, SessionJoined, MError>;
 
-    fn handle(&mut self, msg: JoinSession, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: JoinSession, _: &mut Self::Context) -> Self::Result {
         let session = self.sessions.iter().find(|(k, _)| *k == &msg.session_id);
         let session_id = msg.session_id.clone();
         if let Some((_, game)) = session {
@@ -211,9 +206,9 @@ impl Handler<JoinSession> for SessionManager {
                     name: msg.name,
                     secret: secret.clone(),
                 })
-                .map_err(|e| MError::InternalError)
+                .map_err(|_| MError::InternalError)
                 .and_then(|res| match res {
-                    Ok(_) => Ok(JoinSessionRes { session_id, secret }),
+                    Ok(_) => Ok(SessionJoined { session_id, secret }),
                     Err(e) => Err(e),
                 });
             Box::new(wrap_future::<_, Self>(create_user))
@@ -223,21 +218,19 @@ impl Handler<JoinSession> for SessionManager {
     }
 }
 
-struct JoinSessionRes {
+struct SessionJoined {
     session_id: String,
     secret: String,
 }
 
 struct GameSession {
-    id: String,
-    game: Session<ConnectionAddr>,
+    game: State<ConnectionAddr>,
 }
 
 impl GameSession {
-    fn new(id: String, host_name: String, host_secret: String) -> Self {
+    fn new(host_name: String, host_secret: String) -> Self {
         GameSession {
-            id: id.clone(),
-            game: Session::new(id, Ruleset::default(), host_name, host_secret),
+            game: State::new(Ruleset::default(), host_name, host_secret),
         }
     }
 }
@@ -274,7 +267,7 @@ impl Message for CreateUser {
 impl Handler<CreateUser> for GameSession {
     type Result = Result<(), MError>;
 
-    fn handle(&mut self, msg: CreateUser, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: CreateUser, _: &mut Self::Context) -> Self::Result {
         self.game.create_user(msg.name, msg.secret)
     }
 }
@@ -314,6 +307,7 @@ struct Connection {
     name: String,
     cm: Addr<ConnectionManager>,
     sess: Addr<GameSession>,
+    done_stopping: bool,
 }
 
 impl Connection {
@@ -323,6 +317,7 @@ impl Connection {
             name,
             cm,
             sess,
+            done_stopping: false,
         }
     }
 }
@@ -356,14 +351,21 @@ impl Actor for Connection {
     }
 
     fn stopping(&mut self, ctx: &mut Self::Context) -> Running {
-        debug!("connection {} terminated", self.id);
+        if self.done_stopping {
+            debug!("connection {} ::: {} terminated", self.name, self.id);
+            return Running::Stop;
+        }
+        debug!("starting to stop connection {} ::: {}", self.name, self.id);
         self.cm.do_send(Disconnect {
             id: self.id.clone(),
         });
         let player_conn = wrap_future::<_, Self>(
             self.sess
                 .send(GetPlayerConnection(self.name.clone()))
-                .map_err(|_| ()),
+                .map_err(|e| {
+                    error!("error getting player connection: {}", e);
+                    ()
+                }),
         );
         let unregister = player_conn.map(|connection, act, ctx| {
             let mut should_unregister = false;
@@ -378,14 +380,17 @@ impl Actor for Connection {
             }
 
             if should_unregister {
+                debug!("unregistering user connection: {}", act.name);
                 act.sess.do_send(RegisterConnection {
                     player_name: act.name.clone(),
                     connection: None,
                 });
             };
+            act.done_stopping = true;
+            ctx.stop();
         });
         ctx.spawn(unregister);
-        Running::Stop
+        Running::Continue
     }
 }
 
@@ -405,7 +410,7 @@ struct TerminateConnection;
 impl Handler<TerminateConnection> for Connection {
     type Result = ();
 
-    fn handle(&mut self, msg: TerminateConnection, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, _: TerminateConnection, ctx: &mut Self::Context) -> Self::Result {
         ctx.stop();
     }
 }
@@ -470,7 +475,7 @@ fn create_lobby(
         .send(CreateSession {
             host_name: info.name,
         })
-        .map_err(|e| Error::from(e))
+        .map_err(Error::from)
         .and_then(|resp| {
             Ok(HttpResponse::Ok().json(CreateLobbyResp {
                 session_id: resp.session_id,
@@ -500,7 +505,7 @@ fn join_lobby(
             session_id: info.session_id,
             name: info.name,
         })
-        .map_err(|e| Error::from(e))
+        .map_err(Error::from)
         .and_then(|resp| match resp {
             Ok(res) => Ok(HttpResponse::Ok().json(JoinLobbyRes {
                 session_id: res.session_id,
@@ -585,7 +590,7 @@ fn main() {
         App::new()
             .data(AppState::default())
             .route("/create", web::get().to_async(create_lobby))
-            .route("/join", web::get().to_async(create_lobby))
+            .route("/join", web::get().to_async(join_lobby))
             .route("/ws", web::get().to_async(connect_websocket))
             .wrap(Logger::new("ip=%a code=%r req_mili=%D resp_size=%b"))
     })

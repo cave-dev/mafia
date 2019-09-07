@@ -6,6 +6,7 @@ use crate::ruleset::Ruleset;
 use crate::Result;
 use chrono::{DateTime, Utc};
 use im::{vector, HashSet, Vector};
+use log::debug;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -29,6 +30,7 @@ pub struct State<PC: PlayerConnection> {
 
 impl<PC: PlayerConnection> State<PC> {
     pub fn new(rules: Ruleset, host_name: PlayerName, host_secret: String) -> Self {
+        debug!("creating game: host={} secret={}", host_name, host_secret);
         let next_state_time = rules.morning_end();
         let phase = rules.init_phase();
         let host = Player::new(host_name.clone(), host_secret);
@@ -54,6 +56,7 @@ impl<PC: PlayerConnection> State<PC> {
     }
 
     pub fn get_connection(&self, player_name: PlayerNameRef) -> Option<PC> {
+        debug!("getting player connection {}", player_name);
         match self
             .root
             .players
@@ -67,11 +70,16 @@ impl<PC: PlayerConnection> State<PC> {
     }
 
     pub fn register_connection(&mut self, player_name: PlayerName, conn: Option<PC>) {
+        debug!(
+            "player connection {} registered? {}",
+            player_name,
+            conn.is_some()
+        );
         let player_o = self
             .root
             .players
             .iter_mut()
-            .find(|p| p.get_name() == &player_name);
+            .find(|p| p.get_name() == player_name);
         if let Some(player) = player_o {
             player.connection = conn;
         }
@@ -82,7 +90,7 @@ impl<PC: PlayerConnection> State<PC> {
             .root
             .players
             .iter()
-            .any(|p| p.get_name() == &player_name)
+            .any(|p| p.get_name() == player_name)
         {
             return Err(Error::InvalidPlayerName(player_name));
         }
